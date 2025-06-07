@@ -1,0 +1,37 @@
+image:
+  nginx: "nginx:1.27-alpine"
+  fcgiwrap: "ghcr.io/tianon/fcgiwrap:latest"
+  git: "alpine/git:2.44"
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx   # set to your ingress controller class
+  host: push.podpilot.dev
+  tls:
+    enabled: true
+    secretName: git-gateway-tls   # create or let cert-manager issue
+
+storage:
+  size: 10Gi
+  storageClass: ""   # let Kubernetes default; override for EBS/GCE-PD
+
+auth:
+  # JWT verification is handled by an internal auth_request
+  # Provide your OIDC verifier endpoint + audience
+  enabled: true
+  verifierUrl: "https://podpilot.dev/verify"
+  audience: "git-gateway"
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi

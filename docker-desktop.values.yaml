@@ -1,0 +1,17 @@
+# docker-desktop.values.yaml
+replicaCount: 1
+
+service:
+  type: NodePort         # exposes the gateway at localhost:<nodePort>
+  port: 80
+  nodePort: 32080        # Docker Desktop lets you hit this on localhost
+
+ingress:
+  enabled: false         # no Ingress controller required
+
+storage:
+  size: 2Gi              # plenty for demos
+  storageClass: ""       # Docker Desktop uses the built-in host-path provisioner
+
+auth:
+  enabled: false         # for local hacking; repo is open on localhost
