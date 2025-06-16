@@ -15,3 +15,19 @@ storage:
 
 auth:
   enabled: false         # for local hacking; repo is open on localhost
+
+tokenkeeper:
+  enabled: true
+  image: "python:3.12-alpine"
+  port: 8080
+  nodePort: 32081
+  audience: "git-gateway"
+  extraEnv: []
+  issuer: "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_AE7uogN5r"
+  clientIds: "m95vusubvir6psn1mfac61ond"
+  verifyUser: podpilot
+  postgres:
+    host: tokenkeeper-postgres
+    db: tokenkeeper
+    user: tokenkeeper
+    password: changeme

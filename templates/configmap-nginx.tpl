@@ -14,12 +14,14 @@ data:
     http {
       include       /etc/nginx/mime.types;
       default_type  application/octet-stream;
-      sendfile        on;
+      sendfile on;
 
-      # auth endpoint
-      upstream auth_backend {
-        server 127.0.0.1:9000;  # fcgiwrap handles /auth internally
+      # auth endpoint for tokenkeeper
+      {{- if and .Values.tokenkeeper.enabled }}
+      upstream tokenkeeper_backend {
+        server tokenkeeper:{{ .Values.tokenkeeper.port }};
       }
+      {{- end }}
 
       server {
         listen 80;
@@ -27,26 +29,65 @@ data:
 
         client_max_body_size 1g;
 
-        # only smart HTTP Git traffic
+        # ────────────────────────────────────────────────────────────
+        # Git Smart-HTTP traffic
+        # ────────────────────────────────────────────────────────────
         location ~ (/.*\.git)(/.*)?$ {
-          auth_request off;                         # or /auth; if you enable auth
+          {{- if .Values.tokenkeeper.enabled }}
+          auth_request /auth;
+          {{- else }}
+          auth_request off;
+          {{- end }}
+
+          # expose the sub-request’s status for later inspection
+          auth_request_set $auth_status $upstream_status;
+
+          # any 401/403 from /auth → add Basic challenge
+          error_page 401 403 = @basic401;
+
+          # any other error (incl. 422 → 500) → check & maybe convert
+          error_page 500 = @auth_missing;
 
           include fastcgi_params;
+          fastcgi_param SCRIPT_FILENAME   /usr/libexec/git-core/git-http-backend;
+          fastcgi_param GIT_PROJECT_ROOT  /srv/git;
+          fastcgi_param GIT_HTTP_EXPORT_ALL "";
+          fastcgi_param PATH_INFO         $1$2;
 
-          fastcgi_param  SCRIPT_FILENAME   /usr/libexec/git-core/git-http-backend;
-          fastcgi_param  GIT_PROJECT_ROOT  /srv/git;
-          fastcgi_param  GIT_HTTP_EXPORT_ALL "";
-          fastcgi_param  PATH_INFO         $1$2;
-
-          fastcgi_pass   127.0.0.1:9000;   # matches the fcgiwrap line
+          fastcgi_pass 127.0.0.1:9000;     # matches the fcgiwrap line
           fastcgi_read_timeout 3600;
         }
 
+        # add Basic challenge for “bad / expired” credentials
+        location @basic401 {
+          add_header WWW-Authenticate 'Basic realm="Git repository"' always;
+          return 401;
+        }
+
+        # convert “missing credentials” (auth returned 422) into a challenge
+        location @auth_missing {
+          if ($auth_status = 422) {
+            add_header WWW-Authenticate 'Basic realm="Git repository"' always;
+            return 401;
+          }
+          return 500;   # real 500 for anything else
+        }
+
+        {{- if .Values.tokenkeeper.enabled }}
         location = /auth {
           internal;
-          proxy_pass {{ .Values.auth.verifierUrl }};
+          proxy_http_version 1.1;
+          proxy_method POST;
+          proxy_pass http://tokenkeeper_backend/token/verify;
+          proxy_pass_request_body off;
+          proxy_set_header Content-Length "";
           proxy_set_header Authorization $http_authorization;
-          proxy_set_header X-Audience {{ .Values.auth.audience }};
+          # proxy_set_header X-Audience {{ .Values.tokenkeeper.audience }};
         }
+        {{- else }}
+        location = /auth {
+          return 204;
+        }
+        {{- end }}
       }
     }

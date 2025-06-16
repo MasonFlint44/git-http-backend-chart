@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tokenkeeper
+  labels:
+    app: tokenkeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tokenkeeper
+  template:
+    metadata:
+      labels:
+        app: tokenkeeper
+    spec:
+      containers:
+        - name: tokenkeeper
+          image: {{ .Values.tokenkeeper.image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              pip install --no-cache-dir tokenkeeper-api
+              pkg_path=$(pip show tokenkeeper-api | grep '^Location:' | cut -d' ' -f2)
+              exec fastapi run "${pkg_path}/tokenkeeper" --host 0.0.0.0 --port {{ .Values.tokenkeeper.port }} 
+          ports:
+            - containerPort: {{ .Values.tokenkeeper.port }}
+          env:
+            - name: TOKENKEEPER_AUDIENCE
+              value: {{ .Values.tokenkeeper.audience | quote }}
+            - name: TOKENKEEPER_DB_HOST
+              value: {{ .Values.tokenkeeper.postgres.host | quote }}
+            - name: TOKENKEEPER_DB_NAME
+              value: {{ .Values.tokenkeeper.postgres.db | quote }}
+            - name: TOKENKEEPER_DB_USER
+              value: {{ .Values.tokenkeeper.postgres.user | quote }}
+            - name: TOKENKEEPER_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tokenkeeper-postgres-secret
+                  key: password
+            - name: TOKENKEEPER_ISSUER
+              value: {{ .Values.tokenkeeper.issuer | quote }}
+            - name: TOKENKEEPER_CLIENT_IDS
+              value: {{ .Values.tokenkeeper.clientIds | quote }}
+            - name: TOKENKEEPER_VERIFY_USER
+              value: {{ .Values.tokenkeeper.verifyUser | quote }}
+            {{- range .Values.tokenkeeper.extraEnv }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}

@@ -1,0 +1,38 @@
+# Postgres Deployment for tokenkeeper
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tokenkeeper-postgres
+  labels:
+    app: tokenkeeper-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tokenkeeper-postgres
+  template:
+    metadata:
+      labels:
+        app: tokenkeeper-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.tokenkeeper.postgres.db | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.tokenkeeper.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tokenkeeper-postgres-secret
+                  key: password
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pgdata
+          emptyDir: {}
