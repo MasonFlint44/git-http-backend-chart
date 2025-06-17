@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tokenkeeper-postgres-pvc
+  labels:
+    app: tokenkeeper-postgres
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.tokenkeeper.postgres.storageSize | default "1Gi" }}
+  {{- if .Values.tokenkeeper.postgres.storageClass }}
+  storageClassName: {{ .Values.tokenkeeper.postgres.storageClass }}
+  {{- end }}
